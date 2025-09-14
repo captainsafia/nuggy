@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+
+    <!-- Package as dotnet tool -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nuggy</ToolCommandName>
+    <PackageId>Nuggy.Cli</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <Description>A command line tool for browsing and searching NuGet packages</Description>
+    <PackageIcon>logo.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NuGet.Configuration" />
+    <PackageReference Include="NuGet.Protocol" />
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Spectre.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../assets/logo.png" Pack="true" PackagePath="/" />
+    <None Include="../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>
