@@ -99,9 +99,45 @@ public static class PackageCommand
             }
         }, showPackageArgument, showFeedOption, showVersionOption);
 
+        // package file
+        var fileCommand = new Command("file", "Extract a specific file from a package");
+
+        var filePackageArgument = new Argument<string>("package", "The name of the package");
+        var filePathArgument = new Argument<string>("file-path", "The path to the file within the package");
+        var fileFeedOption = new Option<string>("--feed", "The name of the feed to search (uses default if not specified)")
+        {
+            IsRequired = false
+        };
+        fileFeedOption.AddAlias("-f");
+
+        var fileVersionOption = new Option<string>("--version", "The version of the package (uses latest if not specified)")
+        {
+            IsRequired = false
+        };
+        fileVersionOption.AddAlias("-v");
+
+        fileCommand.AddArgument(filePackageArgument);
+        fileCommand.AddArgument(filePathArgument);
+        fileCommand.AddOption(fileFeedOption);
+        fileCommand.AddOption(fileVersionOption);
+
+        fileCommand.SetHandler(async (string packageName, string filePath, string? feedName, string? version) =>
+        {
+            try
+            {
+                await nugetService.ExtractPackageFileAsync(packageName, filePath, feedName, version);
+            }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]Error extracting package file: {ex.Message}[/]");
+                Environment.Exit(1);
+            }
+        }, filePackageArgument, filePathArgument, fileFeedOption, fileVersionOption);
+
         packageCommand.AddCommand(metadataCommand);
         packageCommand.AddCommand(versionsCommand);
         packageCommand.AddCommand(showCommand);
+        packageCommand.AddCommand(fileCommand);
 
         return packageCommand;
     }

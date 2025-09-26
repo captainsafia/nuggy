@@ -102,6 +102,23 @@ nuggy package show Newtonsoft.Json --version 13.0.3
 nuggy package show Newtonsoft.Json --feed nuget.org
 ```
 
+#### Extract specific files from packages
+
+```bash
+# Extract a specific file from a package
+nuggy package file Microsoft.AspNetCore.OpenApi PACKAGE.md
+
+# Extract a file from a specific version
+nuggy package file Microsoft.AspNetCore.OpenApi microsoft.aspnetcore.openapi.nuspec --version 9.0.0
+
+# Use a specific feed
+nuggy package file Microsoft.AspNetCore.OpenApi PACKAGE.md --feed nuget.org
+
+# Pipe output to other commands
+nuggy package file Microsoft.AspNetCore.OpenApi PACKAGE.md | head -5
+nuggy package file Microsoft.AspNetCore.OpenApi microsoft.aspnetcore.openapi.nuspec | grep -i "version"
+```
+
 ## Contributing
 
 ### :gear: Development Setup

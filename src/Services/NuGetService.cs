@@ -414,4 +414,88 @@ public class NuGetService(FeedService feedService)
         }
         return $"{number:n1} {suffixes[counter]}";
     }
+
+    public async Task ExtractPackageFileAsync(string packageName, string filePath, string? feedName = null, string? version = null)
+    {
+        var repository = await feedService.GetRepositoryAsync(feedName);
+        var metadataResource = await repository.GetResourceAsync<PackageMetadataResource>();
+        var downloadResource = await repository.GetResourceAsync<DownloadResource>();
+        var cancellationToken = CancellationToken.None;
+
+        var packages = await metadataResource.GetMetadataAsync(
+            packageName,
+            includePrerelease: true,
+            includeUnlisted: false,
+            new SourceCacheContext(),
+            NullLogger.Instance,
+            cancellationToken);
+
+        IPackageSearchMetadata? targetPackage;
+        if (!string.IsNullOrEmpty(version))
+        {
+            if (NuGetVersion.TryParse(version, out var parsedVersion))
+            {
+                targetPackage = packages.FirstOrDefault(p => p.Identity.Version.Equals(parsedVersion));
+                if (targetPackage == null)
+                {
+                    throw new InvalidOperationException($"Version '{version}' of package '{packageName}' not found");
+                }
+            }
+            else
+            {
+                throw new ArgumentException($"Invalid version format: '{version}'");
+            }
+        }
+        else
+        {
+            targetPackage = packages.OrderByDescending(p => p.Identity.Version).FirstOrDefault();
+            if (targetPackage == null)
+            {
+                throw new InvalidOperationException($"Package '{packageName}' not found");
+            }
+        }
+
+        var globalPackagesFolder = GetGlobalPackagesFolder();
+        var packagePath = Path.Combine(globalPackagesFolder, targetPackage.Identity.Id.ToLowerInvariant(), targetPackage.Identity.Version.ToNormalizedString());
+
+        // Check if package already exists in global packages folder
+        if (Directory.Exists(packagePath))
+        {
+            var localFilePath = Path.Combine(packagePath, filePath);
+            if (File.Exists(localFilePath))
+            {
+                var fileContent = await File.ReadAllTextAsync(localFilePath);
+                Console.Write(fileContent);
+                return;
+            }
+            else
+            {
+                throw new FileNotFoundException($"File '{filePath}' not found in package '{packageName}' v{targetPackage.Identity.Version}");
+            }
+        }
+
+        // Download package if not in global packages folder
+        var downloadResult = await downloadResource.GetDownloadResourceResultAsync(
+            targetPackage.Identity,
+            new PackageDownloadContext(new SourceCacheContext()),
+            globalPackagesFolder,
+            NullLogger.Instance,
+            cancellationToken);
+
+        if (downloadResult.Status != DownloadResourceResultStatus.Available || downloadResult.PackageStream == null)
+        {
+            throw new InvalidOperationException("Failed to download package");
+        }
+
+        // Extract the specific file from the package stream
+        using var archive = new ZipArchive(downloadResult.PackageStream, ZipArchiveMode.Read);
+        var entry = archive.Entries.FirstOrDefault(e =>
+            string.Equals(e.FullName, filePath, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(e.FullName.Replace('/', Path.DirectorySeparatorChar), filePath, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(e.FullName.Replace('\\', Path.DirectorySeparatorChar), filePath, StringComparison.OrdinalIgnoreCase)) ?? throw new FileNotFoundException($"File '{filePath}' not found in package '{packageName}' v{targetPackage.Identity.Version}");
+        using var entryStream = entry.Open();
+        using var reader = new StreamReader(entryStream);
+        var content = await reader.ReadToEndAsync();
+        Console.Write(content);
+    }
 }
