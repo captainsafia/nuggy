@@ -11,11 +11,9 @@
     <Description>A command line tool for browsing and searching NuGet packages</Description>
     <PackageIcon>logo.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
 
-    <!-- Single-file executable configuration -->
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">osx-arm64</RuntimeIdentifier>
+  <PropertyGroup Condition="'$(PublishProtocol)' != '' OR '$(PublishSingleFile)' == 'true'">
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>link</TrimMode>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
