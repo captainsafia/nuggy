@@ -110,8 +110,6 @@ jobs:
 
       - name: Publish single-file executable
         run: |
-          echo "Publishing for runtime: ${{ matrix.runtime }}"
-          echo "Version: ${{ steps.version.outputs.version }}"
           dotnet publish src/Nuggy.Cli.csproj \
             --configuration Release \
             --runtime ${{ matrix.runtime }} \
@@ -127,42 +125,11 @@ jobs:
             -p:FileVersion=${{ steps.version.outputs.file_version }} \
             -p:Version=${{ steps.version.outputs.version }}
 
-      - name: Debug published files
-        run: |
-          echo "Published files for ${{ matrix.runtime }}:"
-          ls -la ./artifacts/publish/${{ matrix.runtime }}/
-
       - name: Create archive
         run: |
-          echo "Creating archive for ${{ matrix.runtime }}..."
-          echo "Source directory: ./artifacts/publish/${{ matrix.runtime }}/"
-          echo "Files to archive:"
-          ls -la ./artifacts/publish/${{ matrix.runtime }}/
-
           # Always create tar.gz archives regardless of platform (Linux runner has tar available)
           ARCHIVE_PATH="./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.tar.gz"
-          echo "Creating tar.gz archive: $ARCHIVE_PATH"
           tar -czf "$ARCHIVE_PATH" -C "./artifacts/publish/${{ matrix.runtime }}" .
-          echo "Created tar.gz archive"
-
-      - name: Verify archive creation
-        run: |
-          echo "Verifying archive was created..."
-          echo "Current working directory: $(pwd)"
-          echo "Looking for archive files..."
-
-          # Always expect tar.gz files now
-          ARCHIVE_FILE="./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.tar.gz"
-
-          if [ -f "$ARCHIVE_FILE" ]; then
-            echo "✅ Archive found: $ARCHIVE_FILE"
-            ls -la "$ARCHIVE_FILE"
-          else
-            echo "❌ Archive not found: $ARCHIVE_FILE"
-            echo "Files in artifacts directory:"
-            ls -la ./artifacts/
-            exit 1
-          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -212,11 +179,6 @@ jobs:
         with:
           path: ./artifacts
 
-      - name: List downloaded artifacts for debugging
-        run: |
-          echo "Downloaded artifacts structure:"
-          find ./artifacts -type f -name "*.tar.gz" | sort
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -240,7 +202,7 @@ jobs:
 
             1. Download the appropriate archive for your platform
             2. Extract the archive: `tar -xzf nuggy-*.tar.gz`
-            3. Run the `nuggy` executable (or `Nuggy.Cli.exe` on Windows)
+            3. Run the `nuggy` executable
 
             ### Alternatively, install as a .NET tool
 
