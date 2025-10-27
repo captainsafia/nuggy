@@ -148,16 +148,35 @@ jobs:
           echo "Created tar.gz archive"
         fi
 
-    - name: Debug created archives
+    - name: Verify archive creation
       run: |
-        echo "Created archives:"
-        ls -la ./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.*
+        echo "Verifying archive was created..."
+        echo "Current working directory: $(pwd)"
+        echo "Looking for archive files..."
+        if [[ "${{ matrix.runtime }}" == win-* ]]; then
+          ARCHIVE_FILE="./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.zip"
+        else
+          ARCHIVE_FILE="./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.tar.gz"
+        fi
+        
+        if [ -f "$ARCHIVE_FILE" ]; then
+          echo "✅ Archive found: $ARCHIVE_FILE"
+          ls -la "$ARCHIVE_FILE"
+        else
+          echo "❌ Archive not found: $ARCHIVE_FILE"
+          echo "Files in artifacts directory:"
+          ls -la ./artifacts/
+          exit 1
+        fi
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: nuggy-${{ matrix.runtime }}
-        path: ./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.*
+        path: |
+          ./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.zip
+          ./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.tar.gz
+        if-no-files-found: error
 
   create-release:
     # Create GitHub releases for both tagged releases and preview releases from main
