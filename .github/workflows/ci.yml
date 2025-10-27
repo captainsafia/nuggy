@@ -123,6 +123,7 @@ jobs:
             -p:EnableCompressionInSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:AssemblyVersion=${{ steps.version.outputs.assembly_version }} \
+            -p:AssemblyName=nuggy \
             -p:FileVersion=${{ steps.version.outputs.file_version }} \
             -p:Version=${{ steps.version.outputs.version }}
 
