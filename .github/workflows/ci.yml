@@ -193,14 +193,14 @@ jobs:
             # For tags, use the tag name as version
             VERSION=${GITHUB_REF#refs/tags/v}
             IS_PRERELEASE=false
-            RELEASE_NAME="Release $VERSION"
+            RELEASE_NAME="nuggy $VERSION"
           else
             # For main branch, generate preview version
             BASE_VERSION=$(awk -F'[<>]' '/<PackageVersion>/{print $3}' src/Nuggy.Cli.csproj)
             TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
             VERSION="${BASE_VERSION}-preview.${TIMESTAMP}"
             IS_PRERELEASE=true
-            RELEASE_NAME="Preview Release $VERSION"
+            RELEASE_NAME="nuggy $VERSION (Preview)"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
@@ -249,7 +249,7 @@ jobs:
             ```
 
             ${{ steps.version.outputs.is_prerelease == 'true' && '> **Note**: This is a preview release built from the latest main branch. Use at your own risk.' || '' }}
-          files: "./artifacts/nuggy-*/nuggy-${{ steps.version.outputs.version }}-*.tar.gz"
+          files: "./artifacts/nuggy-*/*.tar.gz"
           draft: false
           prerelease: ${{ steps.version.outputs.is_prerelease }}
           token: ${{ secrets.GITHUB_TOKEN }}
