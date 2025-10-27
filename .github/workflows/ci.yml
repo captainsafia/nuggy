@@ -116,8 +116,6 @@ jobs:
             --self-contained true \
             --output ./artifacts/publish/${{ matrix.runtime }} \
             -p:PublishSingleFile=true \
-            -p:PublishTrimmed=true \
-            -p:TrimMode=link \
             -p:EnableCompressionInSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:AssemblyVersion=${{ steps.version.outputs.assembly_version }} \
