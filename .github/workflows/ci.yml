@@ -110,6 +110,8 @@ jobs:
 
     - name: Publish single-file executable
       run: |
+        echo "Publishing for runtime: ${{ matrix.runtime }}"
+        echo "Version: ${{ steps.version.outputs.version }}"
         dotnet publish src/Nuggy.Cli.csproj \
           --configuration Release \
           --runtime ${{ matrix.runtime }} \
@@ -124,16 +126,32 @@ jobs:
           -p:FileVersion=${{ steps.version.outputs.file_version }} \
           -p:Version=${{ steps.version.outputs.version }}
 
+    - name: Debug published files
+      run: |
+        echo "Published files for ${{ matrix.runtime }}:"
+        ls -la ./artifacts/publish/${{ matrix.runtime }}/
+
     - name: Create archive
       run: |
+        echo "Checking artifacts directory structure:"
+        find ./artifacts -type f | head -20
+        echo "Changing to publish directory for ${{ matrix.runtime }}..."
         cd ./artifacts/publish/${{ matrix.runtime }}
+        echo "Creating archive for ${{ matrix.runtime }}..."
         if [[ "${{ matrix.runtime }}" == win-* ]]; then
           # Windows - create zip
           zip -r "../../../nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.zip" .
+          echo "Created zip archive"
         else
           # Linux/macOS - create tar.gz
           tar -czf "../../../nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.tar.gz" .
+          echo "Created tar.gz archive"
         fi
+
+    - name: Debug created archives
+      run: |
+        echo "Created archives:"
+        ls -la ./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.*
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
