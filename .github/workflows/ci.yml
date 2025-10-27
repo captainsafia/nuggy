@@ -4,6 +4,8 @@ on:
   push:
     branches:
         - main
+    tags:
+        - 'v*'
   pull_request:
     branches:
         - main
@@ -49,39 +51,208 @@ jobs:
         name: test-results-${{ matrix.configuration }}
         path: ./artifacts/test-results/*.trx
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifacts-${{ matrix.configuration }}
-        path: |
-          ./artifacts/bin/**/*
-          !./artifacts/bin/**/ref/**
-          !./artifacts/bin/**/*.pdb
+  build-cross-platform:
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        runtime: 
+          - linux-x64
+          - linux-arm64
+          - win-x64
+          - win-arm64
+          - osx-x64
+          - osx-arm64
 
-    - name: Generate preview version
-      if: matrix.configuration == 'Release' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+
+    - name: Generate version
       id: version
       run: |
-        # Get base version from project file (Linux compatible)
-        BASE_VERSION=$(awk -F'[<>]' '/<PackageVersion>/{print $3}' src/Nuggy.Cli.csproj)
-        # Generate timestamp in format YYYYMMDDHHMMSS
-        TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-        # Create preview version: base-preview.timestamp
-        PREVIEW_VERSION="${BASE_VERSION}-preview.${TIMESTAMP}"
-        echo "preview_version=${PREVIEW_VERSION}" >> $GITHUB_OUTPUT
-        echo "Generated preview version: ${PREVIEW_VERSION}"
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # For tags, use the tag name as version
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ASSEMBLY_VERSION="${VERSION}.0"
+          FILE_VERSION="${VERSION}.0"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "assembly_version=${ASSEMBLY_VERSION}" >> $GITHUB_OUTPUT
+          echo "file_version=${FILE_VERSION}" >> $GITHUB_OUTPUT
+          echo "is_release=true" >> $GITHUB_OUTPUT
+        else
+          # For main branch, generate preview version
+          BASE_VERSION=$(awk -F'[<>]' '/<PackageVersion>/{print $3}' src/Nuggy.Cli.csproj)
+          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          VERSION="${BASE_VERSION}-preview.${TIMESTAMP}"
+          ASSEMBLY_VERSION="${BASE_VERSION}.0"
+          FILE_VERSION="${BASE_VERSION}.0"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "assembly_version=${ASSEMBLY_VERSION}" >> $GITHUB_OUTPUT
+          echo "file_version=${FILE_VERSION}" >> $GITHUB_OUTPUT
+          echo "is_release=false" >> $GITHUB_OUTPUT
+        fi
+        echo "Generated version: ${VERSION}"
+
+    - name: Publish single-file executable
+      run: |
+        dotnet publish src/Nuggy.Cli.csproj \
+          --configuration Release \
+          --runtime ${{ matrix.runtime }} \
+          --self-contained true \
+          --output ./artifacts/publish/${{ matrix.runtime }} \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          -p:TrimMode=link \
+          -p:EnableCompressionInSingleFile=true \
+          -p:IncludeNativeLibrariesForSelfExtract=true \
+          -p:AssemblyVersion=${{ steps.version.outputs.assembly_version }} \
+          -p:FileVersion=${{ steps.version.outputs.file_version }} \
+          -p:Version=${{ steps.version.outputs.version }}
+
+    - name: Create archive
+      run: |
+        cd ./artifacts/publish/${{ matrix.runtime }}
+        if [[ "${{ matrix.runtime }}" == win-* ]]; then
+          # Windows - create zip
+          zip -r "../../../nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.zip" .
+        else
+          # Linux/macOS - create tar.gz
+          tar -czf "../../../nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.tar.gz" .
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuggy-${{ matrix.runtime }}
+        path: ./artifacts/nuggy-${{ steps.version.outputs.version }}-${{ matrix.runtime }}.*
+
+  create-release:
+    # Create GitHub releases for both tagged releases and preview releases from main
+    # Tagged releases (v1.0.0) -> stable releases
+    # Main branch pushes -> preview releases with timestamp versions
+    needs: build-cross-platform
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get version
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # For tags, use the tag name as version
+          VERSION=${GITHUB_REF#refs/tags/v}
+          IS_PRERELEASE=false
+          RELEASE_NAME="Release $VERSION"
+        else
+          # For main branch, generate preview version
+          BASE_VERSION=$(awk -F'[<>]' '/<PackageVersion>/{print $3}' src/Nuggy.Cli.csproj)
+          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          VERSION="${BASE_VERSION}-preview.${TIMESTAMP}"
+          IS_PRERELEASE=true
+          RELEASE_NAME="Preview Release $VERSION"
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+        echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+        echo "Generated version: ${VERSION}"
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        name: ${{ steps.version.outputs.release_name }}
+        body: |
+          ## ${{ steps.version.outputs.release_name }}
+          
+          ### Downloads
+          
+          Choose the appropriate binary for your platform:
+          
+          - **Linux x64**: `nuggy-${{ steps.version.outputs.version }}-linux-x64.tar.gz`
+          - **Linux ARM64**: `nuggy-${{ steps.version.outputs.version }}-linux-arm64.tar.gz`
+          - **Windows x64**: `nuggy-${{ steps.version.outputs.version }}-win-x64.zip`
+          - **Windows ARM64**: `nuggy-${{ steps.version.outputs.version }}-win-arm64.zip`
+          - **macOS x64**: `nuggy-${{ steps.version.outputs.version }}-osx-x64.tar.gz`
+          - **macOS ARM64**: `nuggy-${{ steps.version.outputs.version }}-osx-arm64.tar.gz`
+          
+          ### Installation
+          
+          1. Download the appropriate archive for your platform
+          2. Extract the archive
+          3. Run the `nuggy` executable (or `Nuggy.Cli.exe` on Windows)
+          
+          ### Alternatively, install as a .NET tool
+          
+          ```bash
+          dotnet tool install -g Nuggy.Cli
+          ```
+          
+          ${{ steps.version.outputs.is_prerelease == 'true' && '> **Note**: This is a preview release built from the latest main branch. Use at your own risk.' || '' }}
+        files: "./artifacts/nuggy-*/nuggy-*"
+        draft: false
+        prerelease: ${{ steps.version.outputs.is_prerelease }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-nuget:
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+
+    - name: Generate version
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # For tags, use the tag name as version
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "is_release=true" >> $GITHUB_OUTPUT
+        else
+          # For main branch, generate preview version
+          BASE_VERSION=$(awk -F'[<>]' '/<PackageVersion>/{print $3}' src/Nuggy.Cli.csproj)
+          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          VERSION="${BASE_VERSION}-preview.${TIMESTAMP}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "is_release=false" >> $GITHUB_OUTPUT
+        fi
+        echo "Generated version: ${VERSION}"
 
     - name: Pack NuGet package
-      if: matrix.configuration == 'Release' && github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         dotnet pack src/Nuggy.Cli.csproj \
           --configuration Release \
-          --no-build \
           --output ./artifacts/packages \
-          -p:PackageVersion=${{ steps.version.outputs.preview_version }}
+          -p:PackageVersion=${{ steps.version.outputs.version }}
 
     - name: Publish to NuGet.org
-      if: matrix.configuration == 'Release' && github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         dotnet nuget push ./artifacts/packages/*.nupkg \
           --source https://api.nuget.org/v3/index.json \
@@ -89,7 +260,6 @@ jobs:
           --skip-duplicate
 
     - name: Upload NuGet package
-      if: matrix.configuration == 'Release' && github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
         name: nuget-package
