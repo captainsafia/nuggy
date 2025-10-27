@@ -10,6 +10,11 @@ on:
     branches:
         - main
 
+# Add permissions for creating releases
+permissions:
+  contents: write
+  packages: write
+
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_NOLOGO: true
@@ -143,6 +148,9 @@ jobs:
     needs: build-cross-platform
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     
     steps:
     - name: Checkout code
@@ -173,6 +181,11 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         path: ./artifacts
+
+    - name: List downloaded artifacts for debugging
+      run: |
+        echo "Downloaded artifacts structure:"
+        find ./artifacts -type f -name "*.zip" -o -name "*.tar.gz" | sort
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
@@ -206,7 +219,7 @@ jobs:
           ```
           
           ${{ steps.version.outputs.is_prerelease == 'true' && '> **Note**: This is a preview release built from the latest main branch. Use at your own risk.' || '' }}
-        files: "./artifacts/nuggy-*/nuggy-*"
+        files: "./artifacts/nuggy-*/nuggy-${{ steps.version.outputs.version }}-*"
         draft: false
         prerelease: ${{ steps.version.outputs.is_prerelease }}
         token: ${{ secrets.GITHUB_TOKEN }}
