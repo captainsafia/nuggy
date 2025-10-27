@@ -8,11 +8,6 @@ public class ConfigurationManager
     private readonly string _configDirectory;
     private readonly string _settingsFilePath;
     private AppSettings? _cachedSettings;
-    private static readonly JsonSerializerOptions jsonSerializerOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public ConfigurationManager(string? homeDirectory = null)
     {
@@ -64,7 +59,7 @@ public class ConfigurationManager
         try
         {
             var json = await File.ReadAllTextAsync(_settingsFilePath);
-            _cachedSettings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            _cachedSettings = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings) ?? new AppSettings();
             _cachedSettings.ConfigDirectory = _configDirectory;
 
             // Ensure we have at least the default NuGet feed
@@ -92,7 +87,7 @@ public class ConfigurationManager
     {
         try
         {
-            var json = JsonSerializer.Serialize(settings, jsonSerializerOptions);
+            var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
             await File.WriteAllTextAsync(_settingsFilePath, json);
             _cachedSettings = settings;
         }

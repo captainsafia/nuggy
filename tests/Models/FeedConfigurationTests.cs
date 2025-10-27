@@ -34,8 +34,8 @@ public class FeedConfigurationTests
         };
 
         // Act
-        var json = JsonSerializer.Serialize(feed);
-        var deserialized = JsonSerializer.Deserialize<FeedConfiguration>(json);
+        var json = JsonSerializer.Serialize(feed, AppSettingsJsonContext.Default.FeedConfiguration);
+        var deserialized = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.FeedConfiguration);
 
         // Assert
         deserialized.ShouldNotBeNull();
@@ -58,7 +58,7 @@ public class FeedConfigurationTests
         """;
 
         // Act
-        var feed = JsonSerializer.Deserialize<FeedConfiguration>(json);
+        var feed = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.FeedConfiguration);
 
         // Assert
         feed.ShouldNotBeNull();

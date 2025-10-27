@@ -123,7 +123,7 @@ public class FeedServiceTests : IDisposable
         // Set the correct config directory for our temp location
         settings.ConfigDirectory = _testConfigDirectory;
 
-        var json = JsonSerializer.Serialize(settings);
+        var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
         Directory.CreateDirectory(_testConfigDirectory);
         await File.WriteAllTextAsync(_testSettingsPath, json);
 
@@ -135,7 +135,7 @@ public class FeedServiceTests : IDisposable
     {
         File.Exists(_testSettingsPath).ShouldBeTrue();
         var json = await File.ReadAllTextAsync(_testSettingsPath);
-        return JsonSerializer.Deserialize<AppSettings>(json)!;
+        return JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings)!;
     }
 
     public void Dispose()

@@ -59,7 +59,7 @@ public class ConfigurationManagerTests : IDisposable
             ]
         };
 
-        var json = JsonSerializer.Serialize(expectedSettings);
+        var json = JsonSerializer.Serialize(expectedSettings, AppSettingsJsonContext.Default.AppSettings);
         Directory.CreateDirectory(_testConfigDirectory);
         await File.WriteAllTextAsync(_testSettingsPath, json);
 
@@ -99,7 +99,7 @@ public class ConfigurationManagerTests : IDisposable
         var writtenContent = await File.ReadAllTextAsync(_testSettingsPath);
         writtenContent.ShouldNotBeNull();
 
-        var deserializedSettings = JsonSerializer.Deserialize<AppSettings>(writtenContent);
+        var deserializedSettings = JsonSerializer.Deserialize(writtenContent, AppSettingsJsonContext.Default.AppSettings);
         deserializedSettings!.Feeds.Count.ShouldBe(1);
         deserializedSettings.Feeds[0].Name.ShouldBe("test-feed");
     }
@@ -292,7 +292,7 @@ public class ConfigurationManagerTests : IDisposable
 
     private void SetupExistingSettings(AppSettings settings)
     {
-        var json = JsonSerializer.Serialize(settings);
+        var json = JsonSerializer.Serialize(settings, AppSettingsJsonContext.Default.AppSettings);
         Directory.CreateDirectory(_testConfigDirectory);
         File.WriteAllText(_testSettingsPath, json);
     }
@@ -301,7 +301,7 @@ public class ConfigurationManagerTests : IDisposable
     {
         File.Exists(_testSettingsPath).ShouldBeTrue();
         var json = await File.ReadAllTextAsync(_testSettingsPath);
-        return JsonSerializer.Deserialize<AppSettings>(json)!;
+        return JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings)!;
     }
 
     public void Dispose()
